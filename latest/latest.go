@@ -47,7 +47,7 @@ func (ll *LatestLayers) Get(i Index) *DagLayer {
 	if i < ll.max - ll.length {
 		return nil
 	}
-	b := ll.layers[i]
+	b := ll.layers[i % ll.length]
 	if b == nil {
 		return nil
 	}

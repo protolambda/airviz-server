@@ -1,6 +1,9 @@
-package main
+package server
 
-import . "airviz/latest"
+import (
+	. "airviz/latest"
+	"sync"
+)
 
 type Trigger struct {
 	Topic
@@ -21,18 +24,31 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+
+	idMutex sync.Mutex
+	clientIdCounter uint64
 }
 
-func newHub() *Hub {
+func NewHub() *Hub {
 	return &Hub{
 		triggers:  make(chan Trigger),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
+		clientIdCounter: 1,
 	}
 }
 
-func (h *Hub) run() {
+func (h *Hub) NewClientId() uint64 {
+	h.idMutex.Lock()
+	id := h.clientIdCounter
+	h.clientIdCounter += 1
+	h.idMutex.Unlock()
+	return id
+}
+
+func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:

@@ -42,7 +42,7 @@ type StatusUpdateAtom struct {
 	Node *DagNode
 }
 
-// returns the time of the snapshot, with a list of all the layers (shallow copy, items are append-only anyway)
+// returns the time of the snapshot (end of dag), with a list of all the layers (shallow copy, items are append-only anyway)
 func (dag *Dag) GetSnapshot() (Index, []*DagLayer) {
 	length := dag.layers.length
 	// make local copy of layer references, to compute status update on, without being affected by insertion of new layers
@@ -80,9 +80,9 @@ func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusU
 	if end > snapTime {
 		end = snapTime
 	}
-	if stat.Time < snapTime {
+	if stat.Time < dagStart {
 		// client was lagging behind, reset counters in outdated data
-		diff := snapTime - stat.Time
+		diff := dagStart - stat.Time
 		// you can only get so much out of date, don't repeat resets
 		if diff > length {
 			diff = length

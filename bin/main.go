@@ -1,12 +1,15 @@
 package main
 
 import (
+	"airviz/datasrc"
+	"airviz/latest"
+	. "airviz/server"
 	"flag"
 	"log"
 	"net/http"
 )
 
-var addr = flag.String("addr", ":8080", "http service address")
+var addr = flag.String("addr", ":4000", "http service address")
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
@@ -23,11 +26,16 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	hub := newHub()
-	go hub.run()
+	hub := NewHub()
+	go hub.Run()
+
+	blocks := latest.NewDag(300)
+	mockBlocksSrc := datasrc.Mocksrc{Dag: blocks}
+	go mockBlocksSrc.Start()
+
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+		ServeWs(hub, blocks, w, r)
 	})
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {

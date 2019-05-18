@@ -40,7 +40,7 @@ func (dl *DagLayer) Kill() {
 
 func (dl *DagLayer) AddNode(node *DagNode) {
 	if node.Index != dl.index {
-		panic(fmt.Sprintf("cannot add node with index %d layer with index %d", i, dl.index))
+		panic(fmt.Sprintf("cannot add node with index %d layer with index %d", node.Index, dl.index))
 	}
 	dl.Lock()
 	dl.nodes = append(dl.nodes, node)
@@ -55,4 +55,16 @@ func (dl *DagLayer) GetNode(key core.Root) *DagNode {
 		}
 	}
 	return nil
+}
+
+func (dl *DagLayer) GetNodeAtDepth(d uint32) *DagNode {
+	if d < uint32(len(dl.nodes)) {
+		return dl.nodes[d]
+	} else {
+		return nil
+	}
+}
+
+func (dl *DagLayer) GetNodeDepth() uint32 {
+	return uint32(len(dl.nodes))
 }

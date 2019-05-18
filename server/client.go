@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	. "airviz/latest"
@@ -170,13 +170,20 @@ func (c *Client) writePump() {
 }
 
 // serveWs handles websocket requests from the peer.
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func ServeWs(hub *Hub, blocks *Dag, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, buffedMsgCount)}
+
+	client := &Client{
+		id: hub.NewClientId(),
+		hub: hub,
+		conn: conn,
+		send: make(chan []byte, buffedMsgCount),
+		blocks: NewDataRequestHandler(blocks, topicBlocks)}
+
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
