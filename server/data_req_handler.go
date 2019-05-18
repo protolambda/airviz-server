@@ -17,6 +17,8 @@ type DataRequest struct {
 type DataRequestHandler struct {
 	dag *Dag
 
+	topic Topic
+
 	stat *Status
 
 	pushes chan Index
@@ -27,7 +29,7 @@ type DataRequestHandler struct {
 	c *Client
 }
 
-func NewDataRequestHandler(dag *Dag) *DataRequestHandler {
+func NewDataRequestHandler(dag *Dag, topic Topic) *DataRequestHandler {
 	return &DataRequestHandler{
 		dag:         dag,
 		stat:        dag.GetEmptyStatus(),
@@ -61,15 +63,16 @@ func (th *DataRequestHandler) makeRequest(start Index, end Index) {
 	}
 }
 
-func makeUpdateMsg(depth uint32, node *DagNode) []byte {
+func (th *DataRequestHandler) makeUpdateMsg(depth uint32, node *DagNode) []byte {
 	serialized := node.Box.Value.Serialize()
-	// index, depth, parent-root, self-root, serialized value
-	msg := make([]byte, 4+4+32+32+len(serialized))
-	binary.BigEndian.PutUint32(msg[0:4], uint32(node.Box.Index))
-	binary.BigEndian.PutUint32(msg[4:8], depth)
-	copy(msg[8:40], node.Box.ParentKey[:])
-	copy(msg[40:72], node.Box.Key[:])
-	copy(msg[72:], serialized)
+	// topic, index, depth, parent-root, self-root, serialized value
+	msg := make([]byte, 1+4+4+32+32+len(serialized))
+	msg[0] = byte(th.topic)
+	binary.BigEndian.PutUint32(msg[1:5], uint32(node.Box.Index))
+	binary.BigEndian.PutUint32(msg[5:9], depth)
+	copy(msg[9:41], node.Box.ParentKey[:])
+	copy(msg[41:73], node.Box.Key[:])
+	copy(msg[73:], serialized)
 	return msg
 }
 
@@ -83,7 +86,7 @@ func (th *DataRequestHandler) handleRequests() {
 				fmt.Printf("warning: %v\n", err)
 			}
 			for _, u := range updates {
-				th.c.send <- makeUpdateMsg(u.Depth, u.Node)
+				th.c.send <- th.makeUpdateMsg(u.Depth, u.Node)
 			}
 		}
 		// wait for a bit before handling new triggers.

@@ -36,6 +36,6 @@ topic  | time index | depth per index, starting from time index, defines window 
 ### response: update item
 
 ```
-1 byte | 4 bytes    | 4 bytes  | n bytes
-topic  | time index | depth    | SSZ serialized data
+1 byte | 4 bytes    | 4 bytes  | 32 bytes   | 32 bytes | n bytes
+topic  | time index | depth    | parent key | self key | SSZ serialized data
 ```
