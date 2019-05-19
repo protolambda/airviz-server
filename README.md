@@ -29,13 +29,13 @@ Update atom: only new items are send to the client, i.e. the `[old_depth:new_dep
 ### request
 
 ```
-1 byte | 4 bytes    | 4 bytes per index
-topic  | time index | depth per index, starting from time index, defines window of request.
+4 bytes | 4 bytes    | 4 bytes per index
+topic   | time index | depth per index, starting from time index, defines window of request.
 ```
 
 ### response: update item
 
 ```
-1 byte | 4 bytes    | 4 bytes  | 32 bytes   | 32 bytes | n bytes
-topic  | time index | depth    | parent key | self key | SSZ serialized data
+4 bytes | 4 bytes    | 4 bytes  | 20 bytes | 32 bytes   | 32 bytes | n bytes
+topic   | time index | depth    | unused   | parent key | self key | SSZ serialized data
 ```

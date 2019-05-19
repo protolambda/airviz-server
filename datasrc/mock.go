@@ -27,9 +27,8 @@ func (m *Mocksrc) Start(triggerCh chan Trigger)  {
 		rand.Read(id[:])
 		return id
 	}
-	i := Index(0)
 	for {
-		var parentNode *DagNode
+		var node *DagNode
 		snapTime, snap := m.Dag.GetSnapshot()
 		start := Index(0)
 		if snapTime > Index(len(snap)) {
@@ -46,23 +45,26 @@ func (m *Mocksrc) Start(triggerCh chan Trigger)  {
 				continue
 			}
 			d = uint32(rand.Intn(int(d)))
-			parentNode = layer.GetNodeAtDepth(d)
-			if rand.Intn(2) == 0 {
+			node = layer.GetNodeAtDepth(d)
+			break
+		}
+		for node != nil && node.MyRef != nil && (*node.MyRef).Parent != nil {
+			if rand.Intn(10) > 7 {
+				p := *(*node.MyRef).Parent
+				if p != nil {
+					node = p
+				} else {
+					break
+				}
+			} else {
 				break
 			}
 		}
-		ri := i
-		if ri != 0 {
-			if a := Index(rand.Intn(10)); a > i {
-				ri = Index(rand.Intn(int(ri))) + 1
-			}
-			if ri < parentNode.Index {
-				ri = parentNode.Index + 1
-			}
-		}
 		parentKey := core.Root{}
-		if parentNode != nil {
-			parentKey = parentNode.Key
+		ri := Index(0)
+		if node != nil {
+			parentKey = node.Key
+			ri = node.Index + Index(rand.Intn(3))
 		}
 		box := Box{
 			Index: ri,
@@ -73,10 +75,6 @@ func (m *Mocksrc) Start(triggerCh chan Trigger)  {
 		fmt.Printf("add box: %d %x  parent: %x\n", ri, box.Key, box.ParentKey)
 		m.Dag.AddBox(box)
 		triggerCh <- Trigger{Topic: TopicBlocks, Index: box.Index}
-		if a := Index(rand.Intn(10)); a & 3 == 3 {
-			b := a >> 1
-			i += b
-		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 300)
 	}
 }

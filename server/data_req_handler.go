@@ -34,7 +34,7 @@ func NewDataRequestHandler(send func([]byte), dag *Dag, topic Topic) *DataReques
 	return &DataRequestHandler{
 		dag:         dag,
 		topic:       topic,
-		stat:        dag.GetEmptyStatus(),
+		stat:        &Status{0, make([]uint32, dag.Length())},
 		pushes:      make(chan Index, 256),
 		gotRequest:  make(chan bool, 1),
 		lastRequest: nil,
@@ -46,16 +46,9 @@ func (th *DataRequestHandler) Close() {
 	close(th.pushes)
 }
 
-func (th *DataRequestHandler) updateStatus(start Index, status []uint32) {
+func (th *DataRequestHandler) updateStatus(start Index, counts []uint32) {
 	// update local status
-	th.stat.Time = start
-	m := Index(len(status))
-	if m != Index(len(th.stat.Counts)) {
-		return
-	}
-	for i := Index(0); i < m; i++ {
-		th.stat.Counts[(start+i)%m] = status[i]
-	}
+	th.stat.UpdateStatus(start, counts)
 }
 
 func (th *DataRequestHandler) makeRequest(start Index, end Index) {
@@ -66,15 +59,20 @@ func (th *DataRequestHandler) makeRequest(start Index, end Index) {
 }
 
 func (th *DataRequestHandler) makeUpdateMsg(depth uint32, node *DagNode) []byte {
+	if th.lastRequest != nil {
+		if node.Index > th.lastRequest.End {
+			fmt.Println("wtf")
+		}
+	}
 	serialized := node.Box.Value.Serialize()
-	// topic, index, depth, parent-root, self-root, serialized value
-	msg := make([]byte, 1+4+4+32+32+len(serialized))
-	msg[0] = byte(th.topic)
-	binary.BigEndian.PutUint32(msg[1:5], uint32(node.Box.Index))
-	binary.BigEndian.PutUint32(msg[5:9], depth)
-	copy(msg[9:41], node.Box.ParentKey[:])
-	copy(msg[41:73], node.Box.Key[:])
-	copy(msg[73:], serialized)
+	// topic, index, depth, padding, parent-root, self-root, serialized value
+	msg := make([]byte, 4+4+4+20+32+32+len(serialized))
+	binary.LittleEndian.PutUint32(msg[0:8], uint32(th.topic))
+	binary.LittleEndian.PutUint32(msg[4:8], uint32(node.Box.Index))
+	binary.LittleEndian.PutUint32(msg[8:12], depth)
+	copy(msg[32:64], node.Box.ParentKey[:])
+	copy(msg[64:96], node.Box.Key[:])
+	copy(msg[96:], serialized)
 	return msg
 }
 
@@ -107,15 +105,13 @@ func (th *DataRequestHandler) pushesToRequests() {
 		// buffer a bunch of pushes
 		todoLen := len(th.pushes)
 		hitWindow := false
-		checkWindowHit := func(t Index) bool {
+		checkWindowHit := func(t Index) {
 			if th.lastRequest == nil {
-				th.lastRequest = &DataRequest{Start: t, End: t + defaultWindowSpan}
+				th.lastRequest = &DataRequest{Start: 0, End: defaultWindowSpan}
 			}
 			if t >= th.lastRequest.Start && t < th.lastRequest.End {
 				hitWindow = true
-				return true
 			}
-			return false
 		}
 		// we pre-read an item to wait for events, but we don't want to forget about this item
 		if preReadItem != ^Index(0) {

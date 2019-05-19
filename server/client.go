@@ -100,13 +100,13 @@ func (c *Client) readPump() {
 		if len(message) <= 1 + 4 {
 			continue
 		}
-		topic := message[0]
-		start := Index(binary.BigEndian.Uint32(message[1:5]))
-		windowLen := (len(message) - 5) / 4
+		topic := binary.LittleEndian.Uint32(message[0:4])
+		start := Index(binary.LittleEndian.Uint32(message[4:8]))
+		windowLen := (len(message) - 8) / 4
 		data := make([]uint32, windowLen, windowLen)
 		j := 0
-		for i := 5; i < len(message); i += 4 {
-			data[j] = binary.BigEndian.Uint32(message[i:i+4])
+		for i := 8; i < len(message); i += 4 {
+			data[j] = binary.LittleEndian.Uint32(message[i:i+4])
 			j++
 		}
 

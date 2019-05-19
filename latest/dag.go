@@ -2,7 +2,6 @@ package latest
 
 import (
 	. "airviz/core"
-	"errors"
 	"github.com/protolambda/zrnt/eth2/core"
 	"sync"
 )
@@ -32,8 +31,8 @@ func NewDag(length Index) *Dag {
 	}
 }
 
-func (dag *Dag) GetEmptyStatus() *Status {
-	return &Status{0, make([]uint32, dag.layers.length)}
+func (dag *Dag) Length() Index {
+	return dag.layers.length
 }
 
 type StatusUpdateAtom struct {
@@ -59,12 +58,14 @@ func (dag *Dag) GetSnapshot() (Index, []*DagLayer) {
 func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusUpdateAtom, error) {
 	length := dag.layers.length
 	snapTime, layers := dag.GetSnapshot()
-	srcLength := Index(len(stat.Counts))
-	if srcLength != length {
-		return nil, errors.New("cannot compute status update for client status with different length")
+	statLength := Index(len(stat.Counts))
+	if end < snapTime {
+		// request too old
+		return nil, nil
 	}
-	if end + length < snapTime {
-		return nil, errors.New("requested client time is too long ago, data is not maintained")
+	if start > snapTime {
+		// request too new
+		return nil, nil
 	}
 	updates := make([]StatusUpdateAtom, 0)
 	dagStart := dag.layers.max
@@ -72,6 +73,15 @@ func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusU
 		dagStart = 0
 	} else {
 		dagStart -= length
+	}
+	// if out of scope, reset
+	for i := start; i < stat.Time; i++ {
+		statNorm := i % statLength
+		stat.Counts[statNorm] = 0
+	}
+	for i := stat.Time + statLength; i < end; i++ {
+		statNorm := i % statLength
+		stat.Counts[statNorm] = 0
 	}
 	// check for lower bound
 	if start < dagStart {
@@ -81,22 +91,11 @@ func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusU
 	if end > snapTime {
 		end = snapTime
 	}
-	if stat.Time < dagStart {
-		// client was lagging behind, reset counters in outdated data
-		diff := dagStart - stat.Time
-		// you can only get so much out of date, don't repeat resets
-		if diff > length {
-			diff = length
-		}
-		s := stat.Time % length
-		e := s + diff
-		for i := s; i < e; i++ {
-			stat.Counts[i % length] = 0
-		}
-	}
+	// compare data with status
 	for i := start; i < end; i++ {
 		iNorm := i % length
-		prevCount := stat.Counts[iNorm]
+		statNorm := i % statLength
+		prevCount := stat.Counts[statNorm]
 		layer := layers[iNorm]
 		if layer == nil {
 			continue
@@ -109,7 +108,7 @@ func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusU
 				Node: layer.nodes[j],
 			})
 		}
-		stat.Counts[iNorm] = currentCount
+		stat.Counts[statNorm] = currentCount
 	}
 	return updates, nil
 }

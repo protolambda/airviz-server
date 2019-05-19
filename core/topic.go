@@ -1,6 +1,6 @@
 package core
 
-type Topic byte
+type Topic uint32
 
 const (
 	TopicDefault Topic = iota
