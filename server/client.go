@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -52,6 +53,8 @@ type Client struct {
 
 	blocks *DataRequestHandler
 
+	closed bool
+	closeLock sync.Mutex
 }
 
 func (c *Client) Trigger(t Trigger) {
@@ -64,8 +67,11 @@ func (c *Client) Trigger(t Trigger) {
 }
 
 func (c *Client) Close() {
+	c.closeLock.Lock()
 	c.blocks.Close()
+	c.closed = true
 	close(c.send)
+	c.closeLock.Unlock()
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -138,11 +144,14 @@ func (c *Client) writePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.TextMessage)
+			w, err := c.conn.NextWriter(websocket.BinaryMessage)
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			//fmt.Printf("%x\n", message)
+			if _, err := w.Write(message); err != nil {
+				fmt.Printf("Error when sending msg to client: %d, err: %v\n", c.id, err)
+			}
 
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
@@ -163,6 +172,14 @@ func (c *Client) writePump() {
 	}
 }
 
+func (c *Client) sendMsg(msg []byte) {
+	c.closeLock.Lock()
+	if !c.closed {
+		c.send <- msg
+	}
+	c.closeLock.Unlock()
+}
+
 // serveWs handles websocket requests from the peer.
 func ServeWs(hub *Hub, blocks *Dag, w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool {
@@ -179,7 +196,8 @@ func ServeWs(hub *Hub, blocks *Dag, w http.ResponseWriter, r *http.Request) {
 		hub: hub,
 		conn: conn,
 		send: make(chan []byte, buffedMsgCount),
-		blocks: NewDataRequestHandler(blocks, TopicBlocks)}
+	}
+	client.blocks = NewDataRequestHandler(client.sendMsg, blocks, TopicBlocks)
 
 	client.hub.register <- client
 

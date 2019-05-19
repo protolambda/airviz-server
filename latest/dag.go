@@ -98,6 +98,9 @@ func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusU
 		iNorm := i % length
 		prevCount := stat.Counts[iNorm]
 		layer := layers[iNorm]
+		if layer == nil {
+			continue
+		}
 		currentCount := uint32(len(layer.nodes))
 		for j := prevCount; j < currentCount; j++ {
 			// we can update!

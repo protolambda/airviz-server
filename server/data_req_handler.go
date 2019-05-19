@@ -27,10 +27,10 @@ type DataRequestHandler struct {
 	lastRequest *DataRequest
 	gotRequest  chan bool
 
-	c *Client
+	send func([]byte)
 }
 
-func NewDataRequestHandler(dag *Dag, topic Topic) *DataRequestHandler {
+func NewDataRequestHandler(send func([]byte), dag *Dag, topic Topic) *DataRequestHandler {
 	return &DataRequestHandler{
 		dag:         dag,
 		topic:       topic,
@@ -38,6 +38,7 @@ func NewDataRequestHandler(dag *Dag, topic Topic) *DataRequestHandler {
 		pushes:      make(chan Index, 256),
 		gotRequest:  make(chan bool, 1),
 		lastRequest: nil,
+		send:        send,
 	}
 }
 
@@ -87,7 +88,7 @@ func (th *DataRequestHandler) handleRequests() {
 				fmt.Printf("warning: %v\n", err)
 			}
 			for _, u := range updates {
-				th.c.send <- th.makeUpdateMsg(u.Depth, u.Node)
+				th.send(th.makeUpdateMsg(u.Depth, u.Node))
 			}
 		}
 		// wait for a bit before handling new triggers.
