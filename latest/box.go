@@ -1,6 +1,9 @@
 package latest
 
-import "github.com/protolambda/zrnt/eth2/core"
+import (
+	. "airviz/core"
+	"github.com/protolambda/zrnt/eth2/core"
+)
 
 type Serializable interface {
 	Serialize() []byte

@@ -1,6 +1,7 @@
 package server
 
 import (
+	. "airviz/core"
 	. "airviz/latest"
 	"encoding/binary"
 	"fmt"
@@ -29,14 +30,6 @@ const (
 
 )
 
-type Topic byte
-
-const (
-	topicDefault Topic = iota
-	topicBlocks
-	topicState
-)
-
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -63,7 +56,7 @@ type Client struct {
 
 func (c *Client) Trigger(t Trigger) {
 	switch t.Topic {
-	case topicBlocks:
+	case TopicBlocks:
 		c.blocks.pushes <- t.Index
 	default:
 		fmt.Printf("Warning: unhandled trigger: topic: %d index: %d\n", t.Topic, t.Index)
@@ -112,13 +105,14 @@ func (c *Client) readPump() {
 		}
 
 		switch Topic(topic) {
-		case topicBlocks:
+		case TopicBlocks:
 			c.blocks.updateStatus(start, data)
 		default:
 			fmt.Printf("Warning: unhandled topic: %d\n", topic)
 		}
 		c.blocks.makeRequest(start, start + Index(len(data)))
 	}
+	fmt.Println("quiting client")
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -171,6 +165,9 @@ func (c *Client) writePump() {
 
 // serveWs handles websocket requests from the peer.
 func ServeWs(hub *Hub, blocks *Dag, w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -182,7 +179,7 @@ func ServeWs(hub *Hub, blocks *Dag, w http.ResponseWriter, r *http.Request) {
 		hub: hub,
 		conn: conn,
 		send: make(chan []byte, buffedMsgCount),
-		blocks: NewDataRequestHandler(blocks, topicBlocks)}
+		blocks: NewDataRequestHandler(blocks, TopicBlocks)}
 
 	client.hub.register <- client
 

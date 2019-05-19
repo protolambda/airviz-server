@@ -1,6 +1,7 @@
 package latest
 
 import (
+	. "airviz/core"
 	"sync"
 )
 

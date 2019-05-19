@@ -31,7 +31,7 @@ func main() {
 
 	blocks := latest.NewDag(300)
 	mockBlocksSrc := datasrc.Mocksrc{Dag: blocks}
-	go mockBlocksSrc.Start()
+	go mockBlocksSrc.Start(hub.Triggers)
 
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

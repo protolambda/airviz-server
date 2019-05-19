@@ -1,6 +1,7 @@
 package datasrc
 
 import (
+	. "airviz/core"
 	. "airviz/latest"
 	"fmt"
 	"github.com/protolambda/zrnt/eth2/core"
@@ -20,7 +21,7 @@ func (mb *MockBlock) Serialize() []byte {
 	return []byte("foobar")
 }
 
-func (m *Mocksrc) Start()  {
+func (m *Mocksrc) Start(triggerCh chan Trigger)  {
 	newRoot := func() core.Root {
 		id := core.Root{}
 		rand.Read(id[:])
@@ -71,10 +72,11 @@ func (m *Mocksrc) Start()  {
 		}
 		fmt.Printf("add box: %d %x  parent: %x\n", ri, box.Key, box.ParentKey)
 		m.Dag.AddBox(box)
+		triggerCh <- Trigger{Topic: TopicBlocks, Index: box.Index}
 		if a := Index(rand.Intn(10)); a & 3 == 3 {
 			b := a >> 1
 			i += b
 		}
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 100)
 	}
 }

@@ -1,5 +1,7 @@
 package datasrc
 
+import "airviz/core"
+
 type DataSrc interface {
-	Start()
+	Start(triggerCh chan core.Trigger)
 }

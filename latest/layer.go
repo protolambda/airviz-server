@@ -1,6 +1,7 @@
 package latest
 
 import (
+	. "airviz/core"
 	"fmt"
 	"github.com/protolambda/zrnt/eth2/core"
 	"sync"

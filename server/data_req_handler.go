@@ -1,6 +1,7 @@
 package server
 
 import (
+	. "airviz/core"
 	. "airviz/latest"
 	"encoding/binary"
 	"fmt"
@@ -32,6 +33,7 @@ type DataRequestHandler struct {
 func NewDataRequestHandler(dag *Dag, topic Topic) *DataRequestHandler {
 	return &DataRequestHandler{
 		dag:         dag,
+		topic:       topic,
 		stat:        dag.GetEmptyStatus(),
 		pushes:      make(chan Index, 256),
 		gotRequest:  make(chan bool, 1),
@@ -41,7 +43,6 @@ func NewDataRequestHandler(dag *Dag, topic Topic) *DataRequestHandler {
 
 func (th *DataRequestHandler) Close() {
 	close(th.pushes)
-	close(th.gotRequest)
 }
 
 func (th *DataRequestHandler) updateStatus(start Index, status []uint32) {
@@ -57,7 +58,7 @@ func (th *DataRequestHandler) updateStatus(start Index, status []uint32) {
 }
 
 func (th *DataRequestHandler) makeRequest(start Index, end Index) {
-	th.lastRequest = &DataRequest{Start:start, End: end}
+	th.lastRequest = &DataRequest{Start: start, End: end}
 	if len(th.gotRequest) == 0 {
 		th.gotRequest <- true
 	}
