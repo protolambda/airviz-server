@@ -2,11 +2,8 @@ package server
 
 import (
 	. "airviz/core"
-	. "airviz/latest"
-	"encoding/binary"
 	"fmt"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
@@ -27,7 +24,7 @@ const (
 	maxMessageSize = 512
 
 	// Maximum amounts of messages to buffer to a client before disconnecting them
-	buffedMsgCount = 20
+	buffedMsgCount = 2000
 
 )
 
@@ -51,24 +48,16 @@ type Client struct {
 	// Buffered channel of outbound messages.
 	send chan []byte
 
-	blocks *DataRequestHandler
+	clientState *ClientState
 
 	closed bool
 	closeLock sync.Mutex
 }
 
-func (c *Client) Trigger(t Trigger) {
-	switch t.Topic {
-	case TopicBlocks:
-		c.blocks.pushes <- t.Index
-	default:
-		fmt.Printf("Warning: unhandled trigger: topic: %d index: %d\n", t.Topic, t.Index)
-	}
-}
 
 func (c *Client) Close() {
 	c.closeLock.Lock()
-	c.blocks.Close()
+	c.clientState.Close()
 	c.closed = true
 	close(c.send)
 	c.closeLock.Unlock()
@@ -97,26 +86,7 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		if len(message) <= 1 + 4 {
-			continue
-		}
-		topic := binary.LittleEndian.Uint32(message[0:4])
-		start := Index(binary.LittleEndian.Uint32(message[4:8]))
-		windowLen := (len(message) - 8) / 4
-		data := make([]uint32, windowLen, windowLen)
-		j := 0
-		for i := 8; i < len(message); i += 4 {
-			data[j] = binary.LittleEndian.Uint32(message[i:i+4])
-			j++
-		}
-
-		switch Topic(topic) {
-		case TopicBlocks:
-			c.blocks.updateStatus(start, data)
-		default:
-			fmt.Printf("Warning: unhandled topic: %d\n", topic)
-		}
-		c.blocks.makeRequest(start, start + Index(len(data)))
+		c.clientState.OnMessage(message)
 	}
 	fmt.Println("quiting client")
 }
@@ -178,33 +148,4 @@ func (c *Client) sendMsg(msg []byte) {
 		c.send <- msg
 	}
 	c.closeLock.Unlock()
-}
-
-// serveWs handles websocket requests from the peer.
-func ServeWs(hub *Hub, blocks *Dag, w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool {
-		return true
-	}
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	client := &Client{
-		id: hub.NewClientId(),
-		hub: hub,
-		conn: conn,
-		send: make(chan []byte, buffedMsgCount),
-	}
-	client.blocks = NewDataRequestHandler(client.sendMsg, blocks, TopicBlocks)
-
-	client.hub.register <- client
-
-	// Allow collection of memory referenced by the caller by doing all work in
-	// new goroutines.
-	go client.writePump()
-	go client.readPump()
-	go client.blocks.handleRequests()
-	go client.blocks.pushesToRequests()
 }

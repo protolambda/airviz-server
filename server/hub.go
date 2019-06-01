@@ -55,7 +55,7 @@ func (h *Hub) Run() {
 			}
 		case t := <-h.Triggers:
 			for client := range h.clients {
-				client.Trigger(t)
+				client.clientState.Trigger(t)
 			}
 		}
 	}

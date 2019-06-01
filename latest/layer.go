@@ -40,8 +40,8 @@ func (dl *DagLayer) Kill() {
 }
 
 func (dl *DagLayer) AddNode(node *DagNode) {
-	if node.Index != dl.index {
-		panic(fmt.Sprintf("cannot add node with index %d layer with index %d", node.Index, dl.index))
+	if node.Box.Index != dl.index {
+		panic(fmt.Sprintf("cannot add node with index %d layer with index %d", node.Box.Index, dl.index))
 	}
 	dl.Lock()
 	dl.nodes = append(dl.nodes, node)
@@ -51,7 +51,7 @@ func (dl *DagLayer) AddNode(node *DagNode) {
 func (dl *DagLayer) GetNode(key core.Root) *DagNode {
 	// ok w/ concurrency, layer is append only
 	for i := 0; i < len(dl.nodes); i++ {
-		if n := dl.nodes[i]; n.Key == key {
+		if n := dl.nodes[i]; n.Box.Key == key {
 			return n
 		}
 	}

@@ -1,7 +1,15 @@
 package datasrc
 
-import "airviz/core"
+import (
+	. "airviz/core"
+	. "airviz/latest"
+)
+
+type DataEvent struct {
+	Topic Topic
+	Box *Box
+}
 
 type DataSrc interface {
-	Start(triggerCh chan core.Trigger)
+	Start(evCh chan<- DataEvent)
 }

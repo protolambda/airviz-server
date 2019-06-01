@@ -5,6 +5,7 @@ import (
 	. "airviz/latest"
 	"encoding/binary"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -26,6 +27,7 @@ type DataRequestHandler struct {
 
 	lastRequest *DataRequest
 	gotRequest  chan bool
+	statusUpdateLock sync.Mutex
 
 	send func([]byte)
 }
@@ -34,7 +36,7 @@ func NewDataRequestHandler(send func([]byte), dag *Dag, topic Topic) *DataReques
 	return &DataRequestHandler{
 		dag:         dag,
 		topic:       topic,
-		stat:        &Status{0, make([]uint32, dag.Length())},
+		stat:        &Status{Time: 0, Counts: make([]uint32, dag.Length())},
 		pushes:      make(chan Index, 256),
 		gotRequest:  make(chan bool, 1),
 		lastRequest: nil,
@@ -48,7 +50,9 @@ func (th *DataRequestHandler) Close() {
 
 func (th *DataRequestHandler) updateStatus(start Index, counts []uint32) {
 	// update local status
+	th.statusUpdateLock.Lock()
 	th.stat.UpdateStatus(start, counts)
+	th.statusUpdateLock.Unlock()
 }
 
 func (th *DataRequestHandler) makeRequest(start Index, end Index) {
@@ -59,11 +63,6 @@ func (th *DataRequestHandler) makeRequest(start Index, end Index) {
 }
 
 func (th *DataRequestHandler) makeUpdateMsg(depth uint32, node *DagNode) []byte {
-	if th.lastRequest != nil {
-		if node.Index > th.lastRequest.End {
-			fmt.Println("wtf")
-		}
-	}
 	serialized := node.Box.Value.Serialize()
 	// topic, index, depth, padding, parent-root, self-root, serialized value
 	msg := make([]byte, 4+4+4+20+32+32+len(serialized))
@@ -81,15 +80,17 @@ func (th *DataRequestHandler) handleRequests() {
 		// wait for a trigger before continuing
 		<-th.gotRequest
 		if th.lastRequest != nil {
+			th.statusUpdateLock.Lock()
 			updates, err := th.dag.GetStatusUpdate(th.stat, th.lastRequest.Start, th.lastRequest.End)
 			if err != nil {
 				fmt.Printf("warning: %v\n", err)
 			}
+			th.statusUpdateLock.Unlock()
 			for _, u := range updates {
 				th.send(th.makeUpdateMsg(u.Depth, u.Node))
 			}
 		}
-		// wait for a bit before handling new triggers.
+		// wait for a bit before handling new requests.
 		time.Sleep(time.Millisecond * 100)
 	}
 }

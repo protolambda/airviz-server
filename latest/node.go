@@ -1,7 +1,7 @@
 package latest
 
 type DagNode struct {
-	Box
+	Box *Box
 
 	// parent can nil itself to decouple
 	Parent **DagNode
@@ -10,7 +10,7 @@ type DagNode struct {
 
 }
 
-func NewDagNode(b Box) *DagNode {
+func NewDagNode(b *Box) *DagNode {
 	dn := &DagNode{
 		Box: b,
 		Parent: nil,

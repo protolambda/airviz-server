@@ -113,7 +113,7 @@ func (dag *Dag) GetStatusUpdate(stat *Status, start Index, end Index) ([]StatusU
 	return updates, nil
 }
 
-func (dag *Dag) AddBox(box Box) {
+func (dag *Dag) AddBox(box *Box) {
 	if box.ParentKey == box.Key {
 		panic("cannot add box with parent key set to itself")
 	}
