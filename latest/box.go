@@ -9,7 +9,7 @@ type Serializable interface {
 	Serialize() []byte
 }
 
-type Box struct {
+type Node struct {
 	Index     Index
 	Key       core.Root
 	ParentKey core.Root

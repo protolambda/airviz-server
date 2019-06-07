@@ -7,65 +7,49 @@ import (
 	"sync"
 )
 
-type DagLayer struct {
+type Layer struct {
 
 	sync.Mutex
 
 	index Index
 
-	nodes []*DagNode
+	nodes []*Node
 
 }
 
-func NewDagLayer(i Index) *DagLayer {
-	return &DagLayer{
+func NewLayer(i Index) *Layer {
+	return &Layer{
 		index: i,
 	}
 }
 
-func (dl *DagLayer) Index() Index {
-	return dl.index
-}
-
-func (dl *DagLayer) Kill() {
-	var wg sync.WaitGroup
-	for _, n := range dl.nodes {
-		wg.Add(1)
-		go func() {
-			n.Kill()
-			wg.Done()
-		}()
+func (layer *Layer) AddNode(node *Node) {
+	if node.Index != layer.index {
+		panic(fmt.Sprintf("cannot add node with index %d layer with index %d", node.Index, layer.index))
 	}
-	wg.Wait()
+	layer.Lock()
+	layer.nodes = append(layer.nodes, node)
+	layer.Unlock()
 }
 
-func (dl *DagLayer) AddNode(node *DagNode) {
-	if node.Box.Index != dl.index {
-		panic(fmt.Sprintf("cannot add node with index %d layer with index %d", node.Box.Index, dl.index))
-	}
-	dl.Lock()
-	dl.nodes = append(dl.nodes, node)
-	dl.Unlock()
-}
-
-func (dl *DagLayer) GetNode(key core.Root) *DagNode {
+func (layer *Layer) GetNode(key core.Root) *Node {
 	// ok w/ concurrency, layer is append only
-	for i := 0; i < len(dl.nodes); i++ {
-		if n := dl.nodes[i]; n.Box.Key == key {
+	for i := 0; i < len(layer.nodes); i++ {
+		if n := layer.nodes[i]; n.Key == key {
 			return n
 		}
 	}
 	return nil
 }
 
-func (dl *DagLayer) GetNodeAtDepth(d uint32) *DagNode {
-	if d < uint32(len(dl.nodes)) {
-		return dl.nodes[d]
+func (layer *Layer) GetNodeAtDepth(d uint32) *Node {
+	if d < uint32(len(layer.nodes)) {
+		return layer.nodes[d]
 	} else {
 		return nil
 	}
 }
 
-func (dl *DagLayer) GetNodeDepth() uint32 {
-	return uint32(len(dl.nodes))
+func (layer *Layer) GetNodeDepth() uint32 {
+	return uint32(len(layer.nodes))
 }
